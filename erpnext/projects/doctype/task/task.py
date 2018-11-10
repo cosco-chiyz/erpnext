@@ -141,12 +141,13 @@ class Task(NestedSet):
 	def populate_depends_on(self):
 		if self.parent_task:
 			parent = frappe.get_doc('Task', self.parent_task)
-			parent.append("depends_on", {
-				"doctype": "Task Depends On",
-				"task": self.name,
-				"subject": self.subject
-			})
-			parent.save()
+			if not self.name in [row.task for row in parent.depends_on]:
+				parent.append("depends_on", {
+					"doctype": "Task Depends On",
+					"task": self.name,
+					"subject": self.subject
+				})
+				parent.save()
 
 	def on_trash(self):
 		if check_if_child_exists(self.name):
@@ -162,12 +163,16 @@ def check_if_child_exists(name):
 def get_project(doctype, txt, searchfield, start, page_len, filters):
 	from erpnext.controllers.queries import get_match_cond
 	return frappe.db.sql(""" select name from `tabProject`
-			where %(key)s like "%(txt)s"
+			where %(key)s like %(txt)s
 				%(mcond)s
 			order by name
-			limit %(start)s, %(page_len)s """ % {'key': searchfield,
-			'txt': "%%%s%%" % frappe.db.escape(txt), 'mcond':get_match_cond(doctype),
-			'start': start, 'page_len': page_len})
+			limit %(start)s, %(page_len)s""" % {
+				'key': searchfield,
+				'txt': frappe.db.escape('%' + txt + '%'),
+				'mcond':get_match_cond(doctype),
+				'start': start,
+				'page_len': page_len
+			})
 
 
 @frappe.whitelist()

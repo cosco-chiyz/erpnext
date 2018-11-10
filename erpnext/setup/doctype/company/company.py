@@ -95,6 +95,10 @@ class Company(NestedSet):
 		if frappe.flags.country_change:
 			install_country_fixtures(self.name)
 
+		if not frappe.db.get_value("Department", {"company": self.name}):
+			from erpnext.setup.setup_wizard.operations.install_fixtures import install_post_company_fixtures
+			install_post_company_fixtures(self.name)
+
 		if not frappe.db.get_value("Cost Center", {"is_group": 0, "company": self.name}):
 			self.create_default_cost_center()
 
@@ -329,6 +333,8 @@ class Company(NestedSet):
 					% (dt, ', '.join(['%s']*len(boms))), tuple(boms))
 
 		frappe.db.sql("delete from tabEmployee where company=%s", self.name)
+		frappe.db.sql("delete from tabDepartment where company=%s", self.name)
+		frappe.db.sql("delete from `tabTax Withholding Account` where company=%s", self.name)
 
 @frappe.whitelist()
 def enqueue_replace_abbr(company, old, new):
@@ -382,17 +388,19 @@ def update_company_current_month_sales(company):
 	current_month_year = formatdate(today(), "MM-yyyy")
 
 	results = frappe.db.sql('''
-		select
-			sum(base_grand_total) as total, date_format(posting_date, '%m-%Y') as month_year
-		from
+		SELECT
+			SUM(base_grand_total) AS total,
+			DATE_FORMAT(`posting_date`, '%m-%Y') AS month_year
+		FROM
 			`tabSales Invoice`
-		where
-			date_format(posting_date, '%m-%Y')="{0}"
-			and docstatus = 1
-			and company = "{1}"
-		group by
+		WHERE
+			DATE_FORMAT(`posting_date`, '%m-%Y') = '{current_month_year}'
+			AND docstatus = 1
+			AND company = {company}
+		GROUP BY
 			month_year
-	'''.format(current_month_year, frappe.db.escape(company)), as_dict = True)
+	'''.format(current_month_year=current_month_year, company=frappe.db.escape(company)),
+		as_dict = True)
 
 	monthly_total = results[0]['total'] if len(results) > 0 else 0
 
@@ -402,7 +410,7 @@ def update_company_monthly_sales(company):
 	'''Cache past year monthly sales of every company based on sales invoices'''
 	from frappe.utils.goal import get_monthly_results
 	import json
-	filter_str = "company = '{0}' and status != 'Draft' and docstatus=1".format(frappe.db.escape(company))
+	filter_str = "company = {0} and status != 'Draft' and docstatus=1".format(frappe.db.escape(company))
 	month_to_value_dict = get_monthly_results("Sales Invoice", "base_grand_total",
 		"posting_date", filter_str, "sum")
 
@@ -434,9 +442,9 @@ def get_children(doctype, parent=None, company=None, is_root=False):
 		from
 			`tab{doctype}` comp
 		where
-			ifnull(parent_company, "")="{parent}"
+			ifnull(parent_company, "")={parent}
 		""".format(
-			doctype = frappe.db.escape(doctype),
+			doctype = doctype,
 			parent=frappe.db.escape(parent)
 		), as_dict=1)
 

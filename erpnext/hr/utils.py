@@ -80,7 +80,7 @@ class EmployeeBoardingController(Document):
 
 @frappe.whitelist()
 def get_onboarding_details(parent, parenttype):
-	return frappe.get_list("Employee Boarding Activity",
+	return frappe.get_all("Employee Boarding Activity",
 		fields=["activity_name", "role", "user", "required_for_employee_creation", "description"],
 		filters={"parent": parent, "parenttype": parenttype},
 		order_by= "idx")
@@ -178,7 +178,8 @@ def validate_overlap(doc, from_date, to_date, company = None):
 		}, as_dict = 1)
 
 	if overlap_doc:
-		exists_for = doc.employee
+		if doc.get("employee"):
+			exists_for = doc.employee
 		if company:
 			exists_for = company
 		throw_overlap_error(doc, exists_for, overlap_doc[0].name, from_date, to_date)

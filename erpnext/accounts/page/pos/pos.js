@@ -123,6 +123,10 @@ erpnext.pos.PointOfSale = erpnext.taxes_and_totals.extend({
 			me.sync_sales_invoice()
 		});
 
+		this.page.add_menu_item(__("Cashier Closing"), function () {
+			frappe.set_route('List', 'Cashier Closing');
+		});		
+
 		this.page.add_menu_item(__("POS Profile"), function () {
 			frappe.set_route('List', 'POS Profile');
 		});
@@ -1569,15 +1573,16 @@ erpnext.pos.PointOfSale = erpnext.taxes_and_totals.extend({
 				style="margin-right: 5px;">${__('Print')}</a>
 			<a class="btn btn-default new_doc">${__('New')}</a>`);
 
-		$('.print_doc').click(function () {
-			var html = frappe.render(me.print_template_data, me.frm.doc)
-			me.print_document(html)
+		this.msgprint.msg_area.find('.print_doc').on('click', function() {
+			var html = frappe.render(me.print_template_data, me.frm.doc);
+			me.print_document(html);
 		})
 
-		$('.new_doc').click(function () {
-			me.msgprint.hide()
-			me.make_new_cart()
+		this.msgprint.msg_area.find('.new_doc').on('click', function() {
+			me.msgprint.hide();
+			me.make_new_cart();
 		})
+
 	},
 
 	print_document: function (html) {

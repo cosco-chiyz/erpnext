@@ -117,6 +117,13 @@ class AccountsController(TransactionBase):
 			if self.get("group_same_items"):
 				self.group_similar_items()
 
+			df = self.meta.get_field("discount_amount")
+			if self.get("discount_amount") and hasattr(self, "taxes") and not len(self.taxes):
+				df.set("print_hide", 0)
+				self.discount_amount = -self.discount_amount
+			else:
+				df.set("print_hide", 1)
+
 	def validate_paid_amount(self):
 		if hasattr(self, "is_pos") or hasattr(self, "is_paid"):
 			is_paid = self.get("is_pos") or self.get("is_paid")
@@ -708,22 +715,24 @@ class AccountsController(TransactionBase):
 	def group_similar_items(self):
 		group_item_qty = {}
 		group_item_amount = {}
+		# to update serial number in print
+		count = 0
 
 		for item in self.items:
 			group_item_qty[item.item_code] = group_item_qty.get(item.item_code, 0) + item.qty
 			group_item_amount[item.item_code] = group_item_amount.get(item.item_code, 0) + item.amount
 
 		duplicate_list = []
-
 		for item in self.items:
 			if item.item_code in group_item_qty:
+				count += 1
 				item.qty = group_item_qty[item.item_code]
 				item.amount = group_item_amount[item.item_code]
 				item.rate = flt(flt(item.amount) / flt(item.qty), item.precision("rate"))
+				item.idx = count
 				del group_item_qty[item.item_code]
 			else:
 				duplicate_list.append(item)
-
 		for item in duplicate_list:
 			self.remove(item)
 
@@ -772,8 +781,7 @@ class AccountsController(TransactionBase):
 
 		if li:
 			duplicates = '<br>' + '<br>'.join(li)
-			frappe.throw(_("Rows with duplicate due dates in other rows were found: {list}")
-						 .format(list=duplicates))
+			frappe.throw(_("Rows with duplicate due dates in other rows were found: {0}").format(duplicates))
 
 	def validate_payment_schedule_amount(self):
 		if self.doctype == 'Sales Invoice' and self.is_pos: return
